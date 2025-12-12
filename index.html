@@ -49,6 +49,7 @@ body{
   height:70px;
   z-index:6;
 }
+
 #videoBlocker{
   position:absolute;
   inset:0;
@@ -104,7 +105,10 @@ body{
   border-radius:50%;
   animation:spin 1s linear infinite;
 }
-@keyframes spin{to{transform:rotate(360deg)}}
+
+@keyframes spin{
+  to{transform:rotate(360deg)}
+}
 
 /* CONTROLS */
 #controls{
@@ -150,6 +154,7 @@ body{
   height:4px;
   background:rgba(255,255,255,.25);
   border-radius:999px;
+  cursor:pointer;
 }
 #progress::-webkit-slider-thumb{
   appearance:none;
@@ -165,11 +170,13 @@ body{
   align-items:center;
   gap:8px;
 }
+
 #volume{
   width:90px;
   appearance:none;
   height:4px;
   background:rgba(255,255,255,.25);
+  border-radius:999px;
 }
 #volume::-webkit-slider-thumb{
   appearance:none;
@@ -222,8 +229,8 @@ function getVideoId(){
   return u.searchParams.get('v') || u.hash.replace('#','');
 }
 
-let player, duration=0, timer=null, seeking=false;
-let isPlaying=false, playerReady=false, isMuted=false;
+let player, duration=0, isPlaying=false, timer=null, seeking=false;
+let playerReady=false, isMuted=false;
 
 const overlay=document.getElementById('overlay');
 const bigPlay=document.getElementById('bigPlay');
@@ -260,6 +267,7 @@ window.onYouTubeIframeAPIReady=onYouTubeIframeAPIReady;
 function onReady(){
   playerReady=true;
   duration=player.getDuration()||0;
+  loader.style.display='none';
   updateUI();
 }
 
@@ -276,52 +284,53 @@ function onStateChange(e){
   }
   if(e.data===YT.PlayerState.PAUSED){
     isPlaying=false;
-    loader.style.display='none';
     playPause.textContent='▶';
     stopTick();
   }
 }
 
-/* PLAY HANDLERS */
 function safePlay(){
   if(!player || !playerReady) return;
   loader.style.display='flex';
   player.playVideo();
 }
 
-function togglePlay(){
+  function togglePlay(){
   if(!player || !playerReady) return;
+
   if(isPlaying){
-    player.pauseVideo();   // pause = NO reload
+    player.pauseVideo();   // ⏸ pause = NO loader
   }else{
-    loader.style.display='flex';
-    player.playVideo();    // play = loader
+    loader.style.display = 'flex';
+    player.playVideo();    // ▶ play = show loader
   }
 }
 
-bigPlay.onclick=safePlay;
-playPause.onclick=togglePlay;
 
-/* SEEK */
+bigPlay.onclick = safePlay;     
+playPause.onclick = togglePlay; 
+
 progress.oninput=()=>{
   if(!duration) return;
   seeking=true;
   const t=(progress.value/100)*duration;
   timeEl.textContent=fmt(t)+' / '+fmt(duration);
 };
+
 progress.onchange=()=>{
   if(!player || !duration) return;
-  player.seekTo((progress.value/100)*duration,true);
+  const t=(progress.value/100)*duration;
+  player.seekTo(t,true);
   seeking=false;
 };
 
-/* VOLUME */
 volume.oninput=()=>{
   if(!player) return;
   player.setVolume(volume.value);
   isMuted=volume.value==0;
   muteBtn.textContent=isMuted?'🔇':'🔊';
 };
+
 muteBtn.onclick=()=>{
   if(!player) return;
   isMuted=!isMuted;
@@ -329,7 +338,6 @@ muteBtn.onclick=()=>{
   muteBtn.textContent=isMuted?'🔇':'🔊';
 };
 
-/* UI TICK */
 function startTick(){
   stopTick();
   timer=setInterval(updateUI,400);
