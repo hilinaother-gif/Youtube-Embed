@@ -40,20 +40,18 @@ body{
   box-shadow:0 20px 60px rgba(0,0,0,.6);
 }
 
-#player{ width:100%; height:100%; }
+#player{width:100%;height:100%;}
 
-/* === BLOCK HEADER (TITLE / CHANNEL CLICKS) === */
+/* BLOCK HEADER INTERACTION */
 #headerBlocker{
   position:absolute;
-  top:0;
-  left:0;
-  right:0;
+  top:0;left:0;right:0;
   height:70px;
   z-index:6;
   background:transparent;
 }
 
-/* === BLOCK VIDEO INTERACTION / RIGHT CLICK === */
+/* BLOCK RIGHT CLICK / VIDEO INTERACTION */
 #videoBlocker{
   position:absolute;
   inset:0;
@@ -61,7 +59,7 @@ body{
   background:transparent;
 }
 
-/* ===== INTRO OVERLAY ===== */
+/* INTRO OVERLAY */
 #overlay{
   position:absolute;
   inset:0;
@@ -77,8 +75,7 @@ body{
 }
 
 #bigPlay{
-  width:92px;
-  height:92px;
+  width:92px;height:92px;
   border-radius:50%;
   border:0;
   cursor:pointer;
@@ -92,10 +89,10 @@ body{
     0 12px 30px rgba(0,0,0,.6);
 }
 
-/* ===== CONTROLS ===== */
+/* CONTROLS */
 #controls{
   position:absolute;
-  left:0; right:0; bottom:0;
+  left:0;right:0;bottom:0;
   z-index:8;
   padding:12px 14px;
   display:flex;
@@ -117,7 +114,7 @@ body{
   padding:8px 12px;
   border-radius:10px;
 }
-.btn:hover{ background:var(--accent-soft); }
+.btn:hover{background:var(--accent-soft);}
 
 #time{
   font-size:12px;
@@ -129,7 +126,7 @@ body{
   border-radius:10px;
 }
 
-/* ===== PROGRESS ===== */
+/* PROGRESS */
 #progress{
   flex:1;
   appearance:none;
@@ -140,36 +137,16 @@ body{
 }
 #progress::-webkit-slider-thumb{
   appearance:none;
-  width:14px;
-  height:14px;
+  width:14px;height:14px;
   border-radius:50%;
   background:var(--accent);
   box-shadow:0 0 0 4px rgba(255,122,24,.25);
 }
 #progress::-moz-range-thumb{
-  width:14px;
-  height:14px;
+  width:14px;height:14px;
   border-radius:50%;
   background:var(--accent);
   border:none;
-}
-
-/* ===== NO VIDEO ===== */
-#msg{
-  position:absolute;
-  inset:0;
-  display:none;
-  align-items:center;
-  justify-content:center;
-  text-align:center;
-  z-index:10;
-  background:rgba(0,0,0,.75);
-}
-#msg code{
-  color:var(--accent);
-  background:rgba(255,255,255,.12);
-  padding:2px 6px;
-  border-radius:6px;
 }
 </style>
 </head>
@@ -179,57 +156,52 @@ body{
 
   <div id="player"></div>
 
-  <!-- Interaction blockers -->
+  <!-- interaction blockers -->
   <div id="headerBlocker"></div>
   <div id="videoBlocker"></div>
 
-  <!-- Intro overlay -->
+  <!-- intro overlay -->
   <div id="overlay">
     <button id="bigPlay">▶</button>
   </div>
 
-  <!-- Custom controls -->
+  <!-- custom controls -->
   <div id="controls">
     <button id="playPause" class="btn">▶</button>
     <div id="time">0:00 / 0:00</div>
     <input id="progress" type="range" min="0" max="100" value="0" step="0.1">
   </div>
 
-  <div id="msg">
-    <div>
-      <div style="margin-bottom:8px">No video provided</div>
-      <code>?v=VIDEO_ID</code>
-    </div>
-  </div>
-
 </div>
 
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
-/* ===== HELPERS ===== */
+/* HELPERS */
+function fmt(sec){
+  sec=Math.floor(sec||0);
+  return Math.floor(sec/60)+':' + (sec%60<10?'0':'')+(sec%60);
+}
 function getVideoId(){
   const u=new URL(location.href);
   return u.searchParams.get('v')||u.hash.replace('#','');
 }
-function fmt(s){
-  s=Math.floor(s||0);
-  return Math.floor(s/60)+':' + (s%60<10?'0':'')+(s%60);
-}
 
-/* ===== STATE ===== */
-let player,duration=0,isPlaying=false,timer;
+/* STATE */
+let player=null;
+let duration=0;
+let isPlaying=false;
+let timer=null;
+let seeking=false;
 
 const overlay=document.getElementById('overlay');
 const bigPlay=document.getElementById('bigPlay');
 const playPause=document.getElementById('playPause');
 const progress=document.getElementById('progress');
 const timeEl=document.getElementById('time');
-const msg=document.getElementById('msg');
 
 const VIDEO_ID=getVideoId();
-if(!VIDEO_ID) msg.style.display='flex';
 
-/* ===== YT API ===== */
+/* YT API */
 function onYouTubeIframeAPIReady(){
   if(!VIDEO_ID) return;
   player=new YT.Player('player',{
@@ -244,14 +216,19 @@ function onYouTubeIframeAPIReady(){
       disablekb:1
     },
     events:{
-      onReady:()=>{ duration=player.getDuration(); updateUI(); },
+      onReady:onReady,
       onStateChange:onStateChange
     }
   });
 }
 window.onYouTubeIframeAPIReady=onYouTubeIframeAPIReady;
 
-/* ===== PLAYER STATE ===== */
+function onReady(){
+  duration=player.getDuration()||0;
+  updateUI();
+}
+
+/* STATE CHANGES */
 function onStateChange(e){
   if(e.data===YT.PlayerState.PLAYING){
     isPlaying=true;
@@ -267,29 +244,38 @@ function onStateChange(e){
   }
 }
 
-/* ===== CONTROLS ===== */
-bigPlay.onclick=()=>player.playVideo();
-playPause.onclick=()=>isPlaying?player.pauseVideo():player.playVideo();
+/* SAFE CONTROLS */
+bigPlay.onclick=()=>{
+  if(!player || typeof player.playVideo!=='function') return;
+  player.playVideo();
+};
 
-/* ===== SEEK ===== */
-let seeking=false;
+playPause.onclick=()=>{
+  if(!player || typeof player.playVideo!=='function') return;
+  isPlaying ? player.pauseVideo() : player.playVideo();
+};
+
+/* SEEK */
 progress.oninput=()=>{
+  if(!duration) return;
   seeking=true;
   const t=(progress.value/100)*duration;
   timeEl.textContent=fmt(t)+' / '+fmt(duration);
 };
 progress.onchange=()=>{
+  if(!player || !duration) return;
   const t=(progress.value/100)*duration;
   player.seekTo(t,true);
   seeking=false;
 };
 
+/* TICK */
 function startTick(){
   stopTick();
   timer=setInterval(updateUI,400);
 }
 function stopTick(){
-  if(timer) clearInterval(timer);
+  if(timer){clearInterval(timer);timer=null;}
 }
 function updateUI(){
   if(!player) return;
@@ -299,7 +285,7 @@ function updateUI(){
   timeEl.textContent=fmt(cur)+' / '+fmt(duration);
 }
 
-/* ===== DISABLE RIGHT CLICK ON VIDEO ===== */
+/* DISABLE RIGHT CLICK */
 document.getElementById('videoBlocker')
   .addEventListener('contextmenu',e=>e.preventDefault());
 </script>
