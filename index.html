@@ -42,19 +42,23 @@ body{
 
 #player{ width:100%; height:100%; }
 
-/* ===== HIDE YOUTUBE TITLE ===== */
-#titleMask{
+/* === BLOCK HEADER (TITLE / CHANNEL CLICKS) === */
+#headerBlocker{
   position:absolute;
-  top:0; left:0; right:0;
+  top:0;
+  left:0;
+  right:0;
   height:70px;
-  z-index:4;
-  pointer-events:none;
-  background:linear-gradient(
-    to bottom,
-    rgba(0,0,0,.95),
-    rgba(0,0,0,.65),
-    rgba(0,0,0,0)
-  );
+  z-index:6;
+  background:transparent;
+}
+
+/* === BLOCK VIDEO INTERACTION / RIGHT CLICK === */
+#videoBlocker{
+  position:absolute;
+  inset:0;
+  z-index:3;
+  background:transparent;
 }
 
 /* ===== INTRO OVERLAY ===== */
@@ -86,15 +90,13 @@ body{
   box-shadow:
     0 0 0 6px rgba(255,122,24,.15),
     0 12px 30px rgba(0,0,0,.6);
-  transition:transform .15s ease;
 }
-#bigPlay:hover{ transform:scale(1.06); }
 
 /* ===== CONTROLS ===== */
 #controls{
   position:absolute;
   left:0; right:0; bottom:0;
-  z-index:6;
+  z-index:8;
   padding:12px 14px;
   display:flex;
   gap:12px;
@@ -176,12 +178,17 @@ body{
 <div class="wrap">
 
   <div id="player"></div>
-  <div id="titleMask"></div>
 
+  <!-- Interaction blockers -->
+  <div id="headerBlocker"></div>
+  <div id="videoBlocker"></div>
+
+  <!-- Intro overlay -->
   <div id="overlay">
     <button id="bigPlay">▶</button>
   </div>
 
+  <!-- Custom controls -->
   <div id="controls">
     <button id="playPause" class="btn">▶</button>
     <div id="time">0:00 / 0:00</div>
@@ -210,7 +217,7 @@ function fmt(s){
 }
 
 /* ===== STATE ===== */
-let player,duration=0,isPlaying=false,hasStarted=false,timer;
+let player,duration=0,isPlaying=false,timer;
 
 const overlay=document.getElementById('overlay');
 const bigPlay=document.getElementById('bigPlay');
@@ -248,7 +255,6 @@ window.onYouTubeIframeAPIReady=onYouTubeIframeAPIReady;
 function onStateChange(e){
   if(e.data===YT.PlayerState.PLAYING){
     isPlaying=true;
-    hasStarted=true;
     overlay.style.display='none';
     overlay.style.pointerEvents='none';
     playPause.textContent='⏸';
@@ -259,18 +265,13 @@ function onStateChange(e){
     playPause.textContent='▶';
     stopTick();
   }
-  if(e.data===YT.PlayerState.ENDED){
-    isPlaying=false;
-    playPause.textContent='▶';
-    stopTick();
-    overlay.style.display='flex'; // replay
-  }
 }
 
 /* ===== CONTROLS ===== */
 bigPlay.onclick=()=>player.playVideo();
 playPause.onclick=()=>isPlaying?player.pauseVideo():player.playVideo();
 
+/* ===== SEEK ===== */
 let seeking=false;
 progress.oninput=()=>{
   seeking=true;
@@ -297,6 +298,10 @@ function updateUI(){
   if(!seeking && duration) progress.value=(cur/duration)*100;
   timeEl.textContent=fmt(cur)+' / '+fmt(duration);
 }
+
+/* ===== DISABLE RIGHT CLICK ON VIDEO ===== */
+document.getElementById('videoBlocker')
+  .addEventListener('contextmenu',e=>e.preventDefault());
 </script>
 </body>
 </html>
