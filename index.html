@@ -42,24 +42,21 @@ body{
 
 #player{width:100%;height:100%;}
 
-/* BLOCK HEADER INTERACTION */
+/* BLOCKERS */
 #headerBlocker{
   position:absolute;
   top:0;left:0;right:0;
   height:70px;
   z-index:6;
-  background:transparent;
 }
 
-/* BLOCK RIGHT CLICK / VIDEO INTERACTION */
 #videoBlocker{
   position:absolute;
   inset:0;
   z-index:3;
-  background:transparent;
 }
 
-/* INTRO OVERLAY */
+/* OVERLAY */
 #overlay{
   position:absolute;
   inset:0;
@@ -87,6 +84,30 @@ body{
   box-shadow:
     0 0 0 6px rgba(255,122,24,.15),
     0 12px 30px rgba(0,0,0,.6);
+}
+
+/* LOADER */
+#loader{
+  position:absolute;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  background:rgba(0,0,0,.45);
+  z-index:7;
+}
+
+.spinner{
+  width:48px;
+  height:48px;
+  border:4px solid rgba(255,255,255,.25);
+  border-top-color:var(--accent);
+  border-radius:50%;
+  animation:spin 1s linear infinite;
+}
+
+@keyframes spin{
+  to{transform:rotate(360deg)}
 }
 
 /* CONTROLS */
@@ -142,11 +163,26 @@ body{
   background:var(--accent);
   box-shadow:0 0 0 4px rgba(255,122,24,.25);
 }
-#progress::-moz-range-thumb{
-  width:14px;height:14px;
+
+/* VOLUME */
+#volumeWrap{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+#volume{
+  width:90px;
+  appearance:none;
+  height:4px;
+  background:rgba(255,255,255,.25);
+  border-radius:999px;
+}
+#volume::-webkit-slider-thumb{
+  appearance:none;
+  width:12px;height:12px;
   border-radius:50%;
   background:var(--accent);
-  border:none;
 }
 </style>
 </head>
@@ -156,18 +192,25 @@ body{
 
   <div id="player"></div>
 
-  <!-- interaction blockers -->
   <div id="headerBlocker"></div>
   <div id="videoBlocker"></div>
 
-  <!-- intro overlay -->
   <div id="overlay">
     <button id="bigPlay">▶</button>
   </div>
 
-  <!-- custom controls -->
+  <div id="loader">
+    <div class="spinner"></div>
+  </div>
+
   <div id="controls">
     <button id="playPause" class="btn">▶</button>
+
+    <div id="volumeWrap">
+      <button id="mute" class="btn">🔊</button>
+      <input id="volume" type="range" min="0" max="100" value="100">
+    </div>
+
     <div id="time">0:00 / 0:00</div>
     <input id="progress" type="range" min="0" max="100" value="0" step="0.1">
   </div>
@@ -176,32 +219,30 @@ body{
 
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
-/* HELPERS */
 function fmt(sec){
   sec=Math.floor(sec||0);
   return Math.floor(sec/60)+':' + (sec%60<10?'0':'')+(sec%60);
 }
+
 function getVideoId(){
   const u=new URL(location.href);
-  return u.searchParams.get('v')||u.hash.replace('#','');
+  return u.searchParams.get('v') || u.hash.replace('#','');
 }
 
-/* STATE */
-let player=null;
-let duration=0;
-let isPlaying=false;
-let timer=null;
-let seeking=false;
+let player, duration=0, isPlaying=false, timer=null, seeking=false;
+let playerReady=false, isMuted=false;
 
 const overlay=document.getElementById('overlay');
 const bigPlay=document.getElementById('bigPlay');
 const playPause=document.getElementById('playPause');
 const progress=document.getElementById('progress');
 const timeEl=document.getElementById('time');
+const loader=document.getElementById('loader');
+const volume=document.getElementById('volume');
+const muteBtn=document.getElementById('mute');
 
 const VIDEO_ID=getVideoId();
 
-/* YT API */
 function onYouTubeIframeAPIReady(){
   if(!VIDEO_ID) return;
   player=new YT.Player('player',{
@@ -224,16 +265,20 @@ function onYouTubeIframeAPIReady(){
 window.onYouTubeIframeAPIReady=onYouTubeIframeAPIReady;
 
 function onReady(){
+  playerReady=true;
   duration=player.getDuration()||0;
+  loader.style.display='none';
   updateUI();
 }
 
-/* STATE CHANGES */
 function onStateChange(e){
+  if(e.data===YT.PlayerState.BUFFERING){
+    loader.style.display='flex';
+  }
   if(e.data===YT.PlayerState.PLAYING){
+    loader.style.display='none';
     isPlaying=true;
     overlay.style.display='none';
-    overlay.style.pointerEvents='none';
     playPause.textContent='⏸';
     startTick();
   }
@@ -244,24 +289,22 @@ function onStateChange(e){
   }
 }
 
-/* SAFE CONTROLS */
-bigPlay.onclick=()=>{
-  if(!player || typeof player.playVideo!=='function') return;
+function safePlay(){
+  if(!player || !playerReady) return;
+  loader.style.display='flex';
   player.playVideo();
-};
+}
 
-playPause.onclick=()=>{
-  if(!player || typeof player.playVideo!=='function') return;
-  isPlaying ? player.pauseVideo() : player.playVideo();
-};
+bigPlay.onclick=safePlay;
+playPause.onclick=safePlay;
 
-/* SEEK */
 progress.oninput=()=>{
   if(!duration) return;
   seeking=true;
   const t=(progress.value/100)*duration;
   timeEl.textContent=fmt(t)+' / '+fmt(duration);
 };
+
 progress.onchange=()=>{
   if(!player || !duration) return;
   const t=(progress.value/100)*duration;
@@ -269,7 +312,20 @@ progress.onchange=()=>{
   seeking=false;
 };
 
-/* TICK */
+volume.oninput=()=>{
+  if(!player) return;
+  player.setVolume(volume.value);
+  isMuted=volume.value==0;
+  muteBtn.textContent=isMuted?'🔇':'🔊';
+};
+
+muteBtn.onclick=()=>{
+  if(!player) return;
+  isMuted=!isMuted;
+  player[isMuted?'mute':'unMute']();
+  muteBtn.textContent=isMuted?'🔇':'🔊';
+};
+
 function startTick(){
   stopTick();
   timer=setInterval(updateUI,400);
@@ -279,13 +335,11 @@ function stopTick(){
 }
 function updateUI(){
   if(!player) return;
-  duration=player.getDuration()||duration;
   const cur=player.getCurrentTime()||0;
   if(!seeking && duration) progress.value=(cur/duration)*100;
   timeEl.textContent=fmt(cur)+' / '+fmt(duration);
 }
 
-/* DISABLE RIGHT CLICK */
 document.getElementById('videoBlocker')
   .addEventListener('contextmenu',e=>e.preventDefault());
 </script>
