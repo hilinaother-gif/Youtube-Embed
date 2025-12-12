@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Custom YouTube Player</title>
+<title>Custom Video Player</title>
 
 <style>
 :root{
@@ -40,12 +40,24 @@ body{
   box-shadow:0 20px 60px rgba(0,0,0,.6);
 }
 
-#player{
-  width:100%;
-  height:100%;
+#player{ width:100%; height:100%; }
+
+/* ===== HIDE YOUTUBE TITLE ===== */
+#titleMask{
+  position:absolute;
+  top:0; left:0; right:0;
+  height:70px;
+  z-index:4;
+  pointer-events:none;
+  background:linear-gradient(
+    to bottom,
+    rgba(0,0,0,.95),
+    rgba(0,0,0,.65),
+    rgba(0,0,0,0)
+  );
 }
 
-/* ===== OVERLAY (INTRO ONLY) ===== */
+/* ===== INTRO OVERLAY ===== */
 #overlay{
   position:absolute;
   inset:0;
@@ -102,12 +114,8 @@ body{
   cursor:pointer;
   padding:8px 12px;
   border-radius:10px;
-  transition:background .2s ease, transform .1s ease;
 }
-.btn:hover{
-  background:var(--accent-soft);
-  transform:translateY(-1px);
-}
+.btn:hover{ background:var(--accent-soft); }
 
 #time{
   font-size:12px;
@@ -144,7 +152,7 @@ body{
   border:none;
 }
 
-/* ===== NO VIDEO ID ===== */
+/* ===== NO VIDEO ===== */
 #msg{
   position:absolute;
   inset:0;
@@ -152,22 +160,23 @@ body{
   align-items:center;
   justify-content:center;
   text-align:center;
-  padding:18px;
   z-index:10;
   background:rgba(0,0,0,.75);
 }
 #msg code{
+  color:var(--accent);
   background:rgba(255,255,255,.12);
   padding:2px 6px;
   border-radius:6px;
-  color:var(--accent);
 }
 </style>
 </head>
 
 <body>
 <div class="wrap">
+
   <div id="player"></div>
+  <div id="titleMask"></div>
 
   <div id="overlay">
     <button id="bigPlay">▶</button>
@@ -181,62 +190,61 @@ body{
 
   <div id="msg">
     <div>
-      <div style="font-size:16px;margin-bottom:8px;">No video provided</div>
-      <div style="font-size:13px;opacity:.9">
-        Use <code>?v=VIDEO_ID</code><br><br>
-        Example:<br>
-        <code>player.html?v=aTCs0Qv20TU</code>
-      </div>
+      <div style="margin-bottom:8px">No video provided</div>
+      <code>?v=VIDEO_ID</code>
     </div>
   </div>
+
 </div>
 
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
 /* ===== HELPERS ===== */
 function getVideoId(){
-  const u = new URL(location.href);
-  return u.searchParams.get('v') || u.hash.replace('#','');
+  const u=new URL(location.href);
+  return u.searchParams.get('v')||u.hash.replace('#','');
 }
-function fmt(sec){
-  sec = Math.floor(sec||0);
-  return Math.floor(sec/60)+':' + (sec%60<10?'0':'')+(sec%60);
+function fmt(s){
+  s=Math.floor(s||0);
+  return Math.floor(s/60)+':' + (s%60<10?'0':'')+(s%60);
 }
 
 /* ===== STATE ===== */
-let player, duration=0, isPlaying=false, hasStarted=false, timer;
+let player,duration=0,isPlaying=false,hasStarted=false,timer;
 
-const overlay = document.getElementById('overlay');
-const bigPlay = document.getElementById('bigPlay');
-const playPause = document.getElementById('playPause');
-const progress = document.getElementById('progress');
-const timeEl = document.getElementById('time');
-const msg = document.getElementById('msg');
+const overlay=document.getElementById('overlay');
+const bigPlay=document.getElementById('bigPlay');
+const playPause=document.getElementById('playPause');
+const progress=document.getElementById('progress');
+const timeEl=document.getElementById('time');
+const msg=document.getElementById('msg');
 
-const VIDEO_ID = getVideoId();
+const VIDEO_ID=getVideoId();
 if(!VIDEO_ID) msg.style.display='flex';
 
 /* ===== YT API ===== */
 function onYouTubeIframeAPIReady(){
   if(!VIDEO_ID) return;
-  player = new YT.Player('player',{
-    videoId: VIDEO_ID,
+  player=new YT.Player('player',{
+    videoId:VIDEO_ID,
     playerVars:{
       controls:0,
       modestbranding:1,
       rel:0,
       fs:1,
-      playsinline:1
+      playsinline:1,
+      iv_load_policy:3,
+      disablekb:1
     },
     events:{
-      onReady:()=>{ duration = player.getDuration(); updateUI(); },
+      onReady:()=>{ duration=player.getDuration(); updateUI(); },
       onStateChange:onStateChange
     }
   });
 }
-window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
+window.onYouTubeIframeAPIReady=onYouTubeIframeAPIReady;
 
-/* ===== STATES ===== */
+/* ===== PLAYER STATE ===== */
 function onStateChange(e){
   if(e.data===YT.PlayerState.PLAYING){
     isPlaying=true;
@@ -255,16 +263,13 @@ function onStateChange(e){
     isPlaying=false;
     playPause.textContent='▶';
     stopTick();
-    overlay.style.display='flex'; // replay UX
+    overlay.style.display='flex'; // replay
   }
 }
 
 /* ===== CONTROLS ===== */
-bigPlay.onclick = ()=>player && player.playVideo();
-playPause.onclick = ()=>{
-  if(!player) return;
-  isPlaying ? player.pauseVideo() : player.playVideo();
-};
+bigPlay.onclick=()=>player.playVideo();
+playPause.onclick=()=>isPlaying?player.pauseVideo():player.playVideo();
 
 let seeking=false;
 progress.oninput=()=>{
@@ -285,11 +290,10 @@ function startTick(){
 function stopTick(){
   if(timer) clearInterval(timer);
 }
-
 function updateUI(){
   if(!player) return;
-  duration = player.getDuration() || duration;
-  const cur = player.getCurrentTime()||0;
+  duration=player.getDuration()||duration;
+  const cur=player.getCurrentTime()||0;
   if(!seeking && duration) progress.value=(cur/duration)*100;
   timeEl.textContent=fmt(cur)+' / '+fmt(duration);
 }
