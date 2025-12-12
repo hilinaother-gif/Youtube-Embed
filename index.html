@@ -178,7 +178,7 @@ body{
   transform: translateY(0);
 }
 
-/* TIMER - Now shows current time and total duration */
+/* TIMER */
 #timer{
   font-size:12px;
   color:var(--muted);
@@ -269,7 +269,7 @@ body{
   background: rgba(255,255,255,.25);
   border-radius: 999px;
   cursor: pointer;
-  writing-mode: bt-lr; /* IE */
+  writing-mode: bt-lr;
   -webkit-appearance: slider-vertical;
   margin: 0 auto;
 }
@@ -324,6 +324,61 @@ body{
   transform: translateY(-1px);
 }
 
+/* END SCREEN - Custom overlay instead of YouTube's related videos */
+#endScreen {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.8), rgba(0,0,0,0.9));
+  z-index: 4;
+  text-align: center;
+  padding: 20px;
+}
+
+.end-content {
+  background: var(--panel);
+  padding: 32px;
+  border-radius: var(--radius);
+  max-width: 400px;
+  border: 1px solid rgba(255,122,24,0.2);
+}
+
+.end-content h3 {
+  margin: 0 0 16px 0;
+  color: var(--text);
+  font-size: 24px;
+}
+
+.end-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.end-btn {
+  background: var(--accent);
+  color: #000;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.end-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(255,122,24,0.3);
+}
+
+.end-btn.secondary {
+  background: rgba(255,255,255,0.1);
+  color: var(--text);
+}
+
 /* RESPONSIVE */
 @media (max-width: 768px) {
   #bigPlay {
@@ -361,6 +416,18 @@ body{
   
   <div id="headerBlocker"></div>
   <div id="videoBlocker"></div>
+  
+  <!-- Custom overlay for when video ends -->
+  <div id="endScreen">
+    <div class="end-content">
+      <h3>Video Ended</h3>
+      <p>Watch again or try another video</p>
+      <div class="end-buttons">
+        <button id="replayBtn" class="end-btn">↻ Replay</button>
+        <button id="nextBtn" class="end-btn secondary">Next Video</button>
+      </div>
+    </div>
+  </div>
   
   <div id="overlay">
     <button id="bigPlay">▶</button>
@@ -434,8 +501,25 @@ const muteBtn = document.getElementById('mute');
 const fullscreenBtn = document.getElementById('fullscreenBtn');
 const videoBlocker = document.getElementById('videoBlocker');
 const controls = document.getElementById('controls');
+const endScreen = document.getElementById('endScreen');
+const replayBtn = document.getElementById('replayBtn');
+const nextBtn = document.getElementById('nextBtn');
 
 const VIDEO_ID = getVideoId();
+
+// Important: YouTube Player Parameters to prevent related videos
+const PLAYER_PARAMS = {
+  controls: 0,           // Hide YouTube's native controls
+  modestbranding: 1,     // Remove YouTube logo
+  rel: 0,               // CRITICAL: Don't show related videos at end
+  fs: 1,                // Allow fullscreen
+  playsinline: 1,       // Play inline on iOS
+  iv_load_policy: 3,    // Hide annotations
+  disablekb: 0,         // IMPORTANT: Allow keyboard controls (was 1)
+  autoplay: 0,          // Don't autoplay
+  widget_referrer: 'https://custom-player.example.com',
+  origin: window.location.origin
+};
 
 // Show/hide controls with mouse movement
 videoBlocker.addEventListener('mousemove', () => {
@@ -529,6 +613,21 @@ function toggleFullscreen() {
   }
 }
 
+// End screen buttons
+replayBtn.addEventListener('click', () => {
+  endScreen.style.display = 'none';
+  player.seekTo(0);
+  player.playVideo();
+});
+
+nextBtn.addEventListener('click', () => {
+  // In a real app, you would load a new video
+  // For now, just replay the current one
+  endScreen.style.display = 'none';
+  player.seekTo(0);
+  player.playVideo();
+});
+
 // Update progress bar
 function updateProgress(percent) {
   progressFill.style.width = `${percent}%`;
@@ -544,18 +643,11 @@ function onYouTubeIframeAPIReady(){
   if(!VIDEO_ID) return;
   player = new YT.Player('player', {
     videoId: VIDEO_ID,
-    playerVars: {
-      controls: 0,
-      modestbranding: 1,
-      rel: 0,
-      fs: 1,
-      playsinline: 1,
-      iv_load_policy: 3,
-      disablekb: 1
-    },
+    playerVars: PLAYER_PARAMS,
     events: {
       onReady: onReady,
-      onStateChange: onStateChange
+      onStateChange: onStateChange,
+      onError: onPlayerError
     }
   });
 }
@@ -573,14 +665,21 @@ function onReady(){
   volumeValue.textContent = '100%';
 }
 
+function onPlayerError(event) {
+  console.error("YouTube Player Error:", event.data);
+  loader.style.display = 'none';
+}
+
 function onStateChange(e){
   if(e.data === YT.PlayerState.BUFFERING){
     loader.style.display = 'flex';
   }
+  
   if(e.data === YT.PlayerState.PLAYING){
     loader.style.display = 'none';
     isPlaying = true;
     overlay.style.display = 'none';
+    endScreen.style.display = 'none';
     playPause.textContent = '⏸';
     startTick();
     
@@ -592,6 +691,7 @@ function onStateChange(e){
       }
     }, 3000);
   }
+  
   if(e.data === YT.PlayerState.PAUSED){
     isPlaying = false;
     playPause.textContent = '▶';
@@ -599,24 +699,37 @@ function onStateChange(e){
     controls.classList.remove('hidden');
     overlay.classList.remove('fade-out');
   }
+  
+  // IMPORTANT: Handle video end with our custom screen
   if(e.data === YT.PlayerState.ENDED){
     isPlaying = false;
     playPause.textContent = '↻';
     stopTick();
-    overlay.style.display = 'flex';
-    bigPlay.textContent = '↻';
+    
+    // Hide YouTube's native end screen by stopping the video
+    player.stopVideo();
+    
+    // Show our custom end screen
+    setTimeout(() => {
+      endScreen.style.display = 'flex';
+    }, 500);
   }
 }
 
 function togglePlay(){
   if(!player || !playerReady) return;
 
+  // If video ended, restart it
+  if (player.getPlayerState() === YT.PlayerState.ENDED) {
+    endScreen.style.display = 'none';
+    player.seekTo(0);
+    player.playVideo();
+    return;
+  }
+
   if(isPlaying){
     player.pauseVideo();
   } else {
-    if (player.getPlayerState() === YT.PlayerState.ENDED) {
-      player.seekTo(0);
-    }
     player.playVideo();
   }
 }
@@ -640,6 +753,7 @@ bigPlay.onclick = () => {
   if(!player || !playerReady) return;
   
   if (player.getPlayerState() === YT.PlayerState.ENDED) {
+    endScreen.style.display = 'none';
     player.seekTo(0);
   }
   
@@ -690,7 +804,7 @@ document.addEventListener('fullscreenchange', () => {
   fullscreenBtn.textContent = document.fullscreenElement ? '⛶' : '⛶';
 });
 
-// Keyboard shortcuts
+// Keyboard shortcuts - IMPORTANT: Now enabled since disablekb=0
 document.addEventListener('keydown', (e) => {
   if (!playerReady) return;
   
