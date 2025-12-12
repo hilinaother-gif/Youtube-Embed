@@ -112,7 +112,7 @@ body{
 #loader{
   position:absolute;
   inset:0;
-  display:none;
+  display:flex;
   align-items:center;
   justify-content:center;
   background:rgba(0,0,0,.45);
@@ -324,7 +324,7 @@ body{
   transform: translateY(-1px);
 }
 
-/* END SCREEN - Custom overlay instead of YouTube's related videos */
+/* END SCREEN */
 #endScreen {
   position: absolute;
   inset: 0;
@@ -377,6 +377,32 @@ body{
 .end-btn.secondary {
   background: rgba(255,255,255,0.1);
   color: var(--text);
+}
+
+/* INIT ERROR */
+#initError {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.9);
+  z-index: 10;
+  padding: 20px;
+  text-align: center;
+}
+
+.init-error-content {
+  background: var(--panel);
+  padding: 32px;
+  border-radius: var(--radius);
+  max-width: 400px;
+  border-left: 4px solid var(--accent);
+}
+
+.init-error-content h3 {
+  margin-top: 0;
+  color: var(--accent);
 }
 
 /* RESPONSIVE */
@@ -437,6 +463,17 @@ body{
     <div class="spinner"></div>
   </div>
   
+  <!-- Initialization error message -->
+  <div id="initError">
+    <div class="init-error-content">
+      <h3>Player Loading Error</h3>
+      <p>Unable to load the YouTube player. Please try refreshing the page.</p>
+      <div class="end-buttons">
+        <button id="refreshBtn" class="end-btn">Refresh Page</button>
+      </div>
+    </div>
+  </div>
+  
   <div id="controls">
     <button id="playPause" class="btn">▶</button>
     
@@ -460,8 +497,87 @@ body{
   </div>
 </div>
 
-<script src="https://www.youtube.com/iframe_api"></script>
 <script>
+// ==================== FIX FOR YOUTUBE API LOADING ISSUE ====================
+// This solves the page reload problem
+
+// YouTube API state
+let ytApiLoaded = false;
+let ytApiCallbacks = [];
+let initializationAttempted = false;
+let initializationTimeout = null;
+let playerInstance = null;
+
+// Track if we're already trying to load the API
+let scriptLoading = false;
+
+// Function to load YouTube API dynamically
+function loadYouTubeAPI() {
+  // If already loading or loaded, return
+  if (scriptLoading || ytApiLoaded) return;
+  
+  scriptLoading = true;
+  console.log('Loading YouTube API...');
+  
+  const script = document.createElement('script');
+  script.src = 'https://www.youtube.com/iframe_api';
+  script.async = true;
+  
+  // Add error handling for script loading
+  script.onerror = () => {
+    console.error('Failed to load YouTube API script');
+    scriptLoading = false;
+    showInitError();
+  };
+  
+  // Insert the script
+  const firstScript = document.getElementsByTagName('script')[0];
+  firstScript.parentNode.insertBefore(script, firstScript);
+}
+
+// Global callback that YouTube API calls when ready
+window.onYouTubeIframeAPIReady = function() {
+  console.log('YouTube API ready!');
+  ytApiLoaded = true;
+  scriptLoading = false;
+  
+  // Execute all pending callbacks
+  ytApiCallbacks.forEach(callback => {
+    try {
+      callback();
+    } catch(e) {
+      console.error('Error in YouTube API callback:', e);
+    }
+  });
+  ytApiCallbacks = [];
+  
+  // Initialize player if not already done
+  if (!initializationAttempted) {
+    initPlayer();
+  }
+};
+
+// Show initialization error
+function showInitError() {
+  const initError = document.getElementById('initError');
+  const loader = document.getElementById('loader');
+  if (initError) {
+    initError.style.display = 'flex';
+  }
+  if (loader) {
+    loader.style.display = 'none';
+  }
+}
+
+// Hide initialization error
+function hideInitError() {
+  const initError = document.getElementById('initError');
+  if (initError) {
+    initError.style.display = 'none';
+  }
+}
+
+// Utility functions
 function formatTime(seconds){
   seconds = Math.floor(seconds || 0);
   const hours = Math.floor(seconds / 3600);
@@ -476,10 +592,21 @@ function formatTime(seconds){
 
 function getVideoId(){
   const u = new URL(location.href);
-  const videoId = u.searchParams.get('v') || u.hash.replace('#', '') || 'dQw4w9WgXcQ';
+  let videoId = u.searchParams.get('v') || u.hash.replace('#', '');
+  
+  // If no video ID in URL, try to get from localStorage
+  if (!videoId) {
+    videoId = localStorage.getItem('lastVideoId') || 'dQw4w9WgXcQ';
+  } else {
+    // Save to localStorage for next time
+    localStorage.setItem('lastVideoId', videoId);
+  }
+  
+  // Validate video ID length
   return videoId.length === 11 ? videoId : 'dQw4w9WgXcQ';
 }
 
+// Global variables
 let player, duration = 0, isPlaying = false, timer = null, seeking = false;
 let playerReady = false, isMuted = false;
 let mouseMoveTimer, volumePopupTimer;
@@ -504,22 +631,255 @@ const controls = document.getElementById('controls');
 const endScreen = document.getElementById('endScreen');
 const replayBtn = document.getElementById('replayBtn');
 const nextBtn = document.getElementById('nextBtn');
+const refreshBtn = document.getElementById('refreshBtn');
+const initError = document.getElementById('initError');
 
 const VIDEO_ID = getVideoId();
 
-// Important: YouTube Player Parameters to prevent related videos
+// YouTube Player Parameters
 const PLAYER_PARAMS = {
-  controls: 0,           // Hide YouTube's native controls
-  modestbranding: 1,     // Remove YouTube logo
-  rel: 0,               // CRITICAL: Don't show related videos at end
-  fs: 1,                // Allow fullscreen
-  playsinline: 1,       // Play inline on iOS
-  iv_load_policy: 3,    // Hide annotations
-  disablekb: 0,         // IMPORTANT: Allow keyboard controls (was 1)
-  autoplay: 0,          // Don't autoplay
-  widget_referrer: 'https://custom-player.example.com',
-  origin: window.location.origin
+  controls: 0,
+  modestbranding: 1,
+  rel: 0,
+  fs: 1,
+  playsinline: 1,
+  iv_load_policy: 3,
+  disablekb: 0,
+  autoplay: 0,
+  origin: window.location.origin,
+  enablejsapi: 1
 };
+
+// Initialize player
+function initPlayer() {
+  if (initializationAttempted) {
+    console.log('Player initialization already attempted');
+    return;
+  }
+  
+  initializationAttempted = true;
+  console.log('Initializing YouTube player with video:', VIDEO_ID);
+  
+  // Clear any existing timeout
+  if (initializationTimeout) {
+    clearTimeout(initializationTimeout);
+    initializationTimeout = null;
+  }
+  
+  // Set a timeout in case player never initializes
+  initializationTimeout = setTimeout(() => {
+    if (!playerReady) {
+      console.error('Player initialization timeout');
+      showInitError();
+    }
+  }, 10000); // 10 second timeout
+  
+  if (ytApiLoaded) {
+    createPlayer();
+  } else {
+    // API not loaded yet, queue the initialization
+    ytApiCallbacks.push(createPlayer);
+    
+    // Try to load the API if not already loading
+    if (!scriptLoading) {
+      loadYouTubeAPI();
+    }
+  }
+}
+
+function createPlayer() {
+  try {
+    console.log('Creating YouTube player instance...');
+    
+    // Destroy existing player if any
+    if (playerInstance && typeof playerInstance.destroy === 'function') {
+      playerInstance.destroy();
+    }
+    
+    playerInstance = new YT.Player('player', {
+      videoId: VIDEO_ID,
+      playerVars: PLAYER_PARAMS,
+      events: {
+        onReady: onReady,
+        onStateChange: onStateChange,
+        onError: onPlayerError,
+        onApiChange: onApiChange
+      }
+    });
+    
+    player = playerInstance;
+  } catch (error) {
+    console.error('Error creating YouTube player:', error);
+    showInitError();
+  }
+}
+
+// Event Handlers
+function onReady(event){
+  console.log('YouTube Player Ready');
+  clearTimeout(initializationTimeout);
+  hideInitError();
+  
+  playerReady = true;
+  duration = player.getDuration() || 0;
+  loader.style.display = 'none';
+  updateUI();
+  
+  // Set initial volume
+  player.setVolume(100);
+  updateVolumeFill(100);
+  volumeValue.textContent = '100%';
+}
+
+function onPlayerError(event) {
+  console.error("YouTube Player Error:", event.data);
+  loader.style.display = 'none';
+  
+  // Show user-friendly error based on error code
+  const errorMessages = {
+    2: "Invalid video ID. Please check the URL.",
+    5: "The HTML5 player has encountered an error.",
+    100: "Video not found or removed.",
+    101: "Video embedding disabled by uploader.",
+    150: "Video embedding disabled by uploader."
+  };
+  
+  const message = errorMessages[event.data] || "Unable to play video. Please try another.";
+  showInitError(message);
+}
+
+function onApiChange(event) {
+  console.log('YouTube API changed:', event.data);
+}
+
+function onStateChange(e){
+  console.log('Player state changed:', e.data);
+  
+  if(e.data === YT.PlayerState.BUFFERING){
+    loader.style.display = 'flex';
+  }
+  
+  if(e.data === YT.PlayerState.PLAYING){
+    loader.style.display = 'none';
+    isPlaying = true;
+    overlay.style.display = 'none';
+    endScreen.style.display = 'none';
+    playPause.textContent = '⏸';
+    startTick();
+    
+    // Auto-hide controls after 3 seconds
+    setTimeout(() => {
+      if (isPlaying && !showVolumePopup) {
+        controls.classList.add('hidden');
+        overlay.classList.add('fade-out');
+      }
+    }, 3000);
+  }
+  
+  if(e.data === YT.PlayerState.PAUSED){
+    isPlaying = false;
+    playPause.textContent = '▶';
+    stopTick();
+    controls.classList.remove('hidden');
+    overlay.classList.remove('fade-out');
+  }
+  
+  if(e.data === YT.PlayerState.ENDED){
+    isPlaying = false;
+    playPause.textContent = '↻';
+    stopTick();
+    
+    // Hide YouTube's native end screen
+    player.stopVideo();
+    
+    // Show our custom end screen
+    setTimeout(() => {
+      endScreen.style.display = 'flex';
+    }, 500);
+  }
+  
+  if(e.data === YT.PlayerState.CUED){
+    console.log('Video cued');
+  }
+}
+
+// UI Update functions
+function updateProgress(percent) {
+  progressFill.style.width = `${percent}%`;
+  progressHandle.style.left = `${percent}%`;
+}
+
+function updateVolumeFill(value) {
+  volumeFill.style.height = `${value}%`;
+}
+
+function startTick(){
+  stopTick();
+  timer = setInterval(updateUI, 200);
+}
+
+function stopTick(){
+  if(timer){
+    clearInterval(timer);
+    timer = null;
+  }
+}
+
+function updateUI(){
+  if(!player || !playerReady) return;
+  try {
+    const currentTime = player.getCurrentTime() || 0;
+    const percent = (currentTime / duration) * 100 || 0;
+    
+    if(!seeking) {
+      updateProgress(percent);
+    }
+    
+    timerEl.textContent = `${formatTime(currentTime)} / ${formatTime(duration)}`;
+  } catch(e) {
+    console.error('Error updating UI:', e);
+  }
+}
+
+// Player control functions
+function togglePlay(){
+  if(!player || !playerReady) return;
+
+  if (player.getPlayerState() === YT.PlayerState.ENDED) {
+    endScreen.style.display = 'none';
+    player.seekTo(0);
+    player.playVideo();
+    return;
+  }
+
+  if(isPlaying){
+    player.pauseVideo();
+  } else {
+    player.playVideo();
+  }
+}
+
+function toggleMute(){
+  if(!player || !playerReady) return;
+  isMuted = !isMuted;
+  player[isMuted ? 'mute' : 'unMute']();
+  muteBtn.textContent = isMuted ? '🔇' : '🔊';
+  
+  if (isMuted) {
+    volumeSlider.value = 0;
+  } else {
+    volumeSlider.value = 100;
+  }
+  updateVolumeFill(volumeSlider.value);
+  volumeValue.textContent = `${volumeSlider.value}%`;
+}
+
+// Event Listeners
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('DOM loaded, initializing player...');
+  // Start initialization
+  initPlayer();
+});
 
 // Show/hide controls with mouse movement
 videoBlocker.addEventListener('mousemove', () => {
@@ -591,7 +951,7 @@ volumePopup.addEventListener('mouseleave', () => {
 // Volume slider
 volumeSlider.addEventListener('input', (e) => {
   const value = e.target.value;
-  if (!player) return;
+  if (!player || !playerReady) return;
   
   player.setVolume(value);
   isMuted = value == 0;
@@ -616,139 +976,26 @@ function toggleFullscreen() {
 // End screen buttons
 replayBtn.addEventListener('click', () => {
   endScreen.style.display = 'none';
-  player.seekTo(0);
-  player.playVideo();
+  if (player && playerReady) {
+    player.seekTo(0);
+    player.playVideo();
+  }
 });
 
 nextBtn.addEventListener('click', () => {
-  // In a real app, you would load a new video
-  // For now, just replay the current one
   endScreen.style.display = 'none';
-  player.seekTo(0);
-  player.playVideo();
-});
-
-// Update progress bar
-function updateProgress(percent) {
-  progressFill.style.width = `${percent}%`;
-  progressHandle.style.left = `${percent}%`;
-}
-
-// Update volume fill
-function updateVolumeFill(value) {
-  volumeFill.style.height = `${value}%`;
-}
-
-function onYouTubeIframeAPIReady(){
-  if(!VIDEO_ID) return;
-  player = new YT.Player('player', {
-    videoId: VIDEO_ID,
-    playerVars: PLAYER_PARAMS,
-    events: {
-      onReady: onReady,
-      onStateChange: onStateChange,
-      onError: onPlayerError
-    }
-  });
-}
-window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
-
-function onReady(){
-  playerReady = true;
-  duration = player.getDuration() || 0;
-  loader.style.display = 'none';
-  updateUI();
-  
-  // Set initial volume
-  player.setVolume(100);
-  updateVolumeFill(100);
-  volumeValue.textContent = '100%';
-}
-
-function onPlayerError(event) {
-  console.error("YouTube Player Error:", event.data);
-  loader.style.display = 'none';
-}
-
-function onStateChange(e){
-  if(e.data === YT.PlayerState.BUFFERING){
-    loader.style.display = 'flex';
-  }
-  
-  if(e.data === YT.PlayerState.PLAYING){
-    loader.style.display = 'none';
-    isPlaying = true;
-    overlay.style.display = 'none';
-    endScreen.style.display = 'none';
-    playPause.textContent = '⏸';
-    startTick();
-    
-    // Auto-hide controls after 3 seconds
-    setTimeout(() => {
-      if (isPlaying && !showVolumePopup) {
-        controls.classList.add('hidden');
-        overlay.classList.add('fade-out');
-      }
-    }, 3000);
-  }
-  
-  if(e.data === YT.PlayerState.PAUSED){
-    isPlaying = false;
-    playPause.textContent = '▶';
-    stopTick();
-    controls.classList.remove('hidden');
-    overlay.classList.remove('fade-out');
-  }
-  
-  // IMPORTANT: Handle video end with our custom screen
-  if(e.data === YT.PlayerState.ENDED){
-    isPlaying = false;
-    playPause.textContent = '↻';
-    stopTick();
-    
-    // Hide YouTube's native end screen by stopping the video
-    player.stopVideo();
-    
-    // Show our custom end screen
-    setTimeout(() => {
-      endScreen.style.display = 'flex';
-    }, 500);
-  }
-}
-
-function togglePlay(){
-  if(!player || !playerReady) return;
-
-  // If video ended, restart it
-  if (player.getPlayerState() === YT.PlayerState.ENDED) {
-    endScreen.style.display = 'none';
+  if (player && playerReady) {
     player.seekTo(0);
     player.playVideo();
-    return;
   }
+});
 
-  if(isPlaying){
-    player.pauseVideo();
-  } else {
-    player.playVideo();
-  }
-}
+// Refresh button
+refreshBtn.addEventListener('click', () => {
+  location.reload();
+});
 
-function toggleMute(){
-  if(!player) return;
-  isMuted = !isMuted;
-  player[isMuted ? 'mute' : 'unMute']();
-  muteBtn.textContent = isMuted ? '🔇' : '🔊';
-  
-  if (isMuted) {
-    volumeSlider.value = 0;
-  } else {
-    volumeSlider.value = 100;
-  }
-  updateVolumeFill(volumeSlider.value);
-  volumeValue.textContent = `${volumeSlider.value}%`;
-}
-
+// Big play button
 bigPlay.onclick = () => {
   if(!player || !playerReady) return;
   
@@ -760,33 +1007,10 @@ bigPlay.onclick = () => {
   player.playVideo();
 };
 
+// Play/pause button
 playPause.onclick = togglePlay;
 
-function startTick(){
-  stopTick();
-  timer = setInterval(updateUI, 200);
-}
-
-function stopTick(){
-  if(timer){
-    clearInterval(timer);
-    timer = null;
-  }
-}
-
-function updateUI(){
-  if(!player) return;
-  const currentTime = player.getCurrentTime() || 0;
-  const percent = (currentTime / duration) * 100 || 0;
-  
-  if(!seeking) {
-    updateProgress(percent);
-  }
-  
-  timerEl.textContent = `${formatTime(currentTime)} / ${formatTime(duration)}`;
-}
-
-// Initialize
+// Initialize volume display
 updateVolumeFill(100);
 
 // Prevent right-click on video
@@ -804,7 +1028,7 @@ document.addEventListener('fullscreenchange', () => {
   fullscreenBtn.textContent = document.fullscreenElement ? '⛶' : '⛶';
 });
 
-// Keyboard shortcuts - IMPORTANT: Now enabled since disablekb=0
+// Keyboard shortcuts
 document.addEventListener('keydown', (e) => {
   if (!playerReady) return;
   
@@ -864,6 +1088,38 @@ document.addEventListener('keydown', (e) => {
       break;
   }
 });
+
+// Page visibility change handler (for when tab becomes active)
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && playerReady) {
+    // Page became visible, ensure player is working
+    console.log('Page became visible, checking player...');
+  }
+});
+
+// Before page unload
+window.addEventListener('beforeunload', () => {
+  if (player && playerReady) {
+    // Clean up player
+    try {
+      player.stopVideo();
+      if (typeof player.destroy === 'function') {
+        player.destroy();
+      }
+    } catch(e) {
+      console.error('Error cleaning up player:', e);
+    }
+  }
+});
+
+// Try to reinitialize if page becomes visible and player isn't ready
+setInterval(() => {
+  if (!playerReady && document.visibilityState === 'visible' && !initializationAttempted) {
+    console.log('Attempting to reinitialize player...');
+    initPlayer();
+  }
+}, 5000);
+
 </script>
 </body>
 </html>
