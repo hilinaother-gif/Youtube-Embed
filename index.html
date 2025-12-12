@@ -38,14 +38,22 @@ body{
   border-radius:var(--radius);
   overflow:hidden;
   box-shadow:0 20px 60px rgba(0,0,0,.6);
-  touch-action:manipulation;
 }
 
 #player{width:100%;height:100%;}
 
 /* BLOCKERS */
-#headerBlocker{position:absolute;top:0;left:0;right:0;height:70px;z-index:6;}
-#videoBlocker{position:absolute;inset:0;z-index:3;}
+#headerBlocker{
+  position:absolute;
+  top:0;left:0;right:0;
+  height:70px;
+  z-index:6;
+}
+#videoBlocker{
+  position:absolute;
+  inset:0;
+  z-index:3;
+}
 
 /* OVERLAY */
 #overlay{
@@ -54,7 +62,11 @@ body{
   display:flex;
   align-items:center;
   justify-content:center;
-  background:linear-gradient(to bottom,rgba(0,0,0,.45),rgba(0,0,0,.25));
+  background:linear-gradient(
+    to bottom,
+    rgba(0,0,0,.45),
+    rgba(0,0,0,.25)
+  );
   z-index:5;
 }
 
@@ -68,7 +80,9 @@ body{
   font-size:36px;
   display:grid;
   place-items:center;
-  box-shadow:0 0 0 6px rgba(255,122,24,.15),0 12px 30px rgba(0,0,0,.6);
+  box-shadow:
+    0 0 0 6px rgba(255,122,24,.15),
+    0 12px 30px rgba(0,0,0,.6);
 }
 
 /* LOADER */
@@ -83,7 +97,8 @@ body{
 }
 
 .spinner{
-  width:48px;height:48px;
+  width:48px;
+  height:48px;
   border:4px solid rgba(255,255,255,.25);
   border-top-color:var(--accent);
   border-radius:50%;
@@ -100,14 +115,11 @@ body{
   display:flex;
   gap:12px;
   align-items:center;
-  background:linear-gradient(to top,rgba(0,0,0,.9),rgba(0,0,0,0));
-  opacity:1;
-  transition:opacity .35s ease;
-}
-
-.controls-hidden{
-  opacity:0;
-  pointer-events:none;
+  background:linear-gradient(
+    to top,
+    rgba(0,0,0,.9),
+    rgba(0,0,0,0)
+  );
 }
 
 .btn{
@@ -119,6 +131,7 @@ body{
   padding:8px 12px;
   border-radius:10px;
 }
+.btn:hover{background:var(--accent-soft);}
 
 #time{
   font-size:12px;
@@ -143,16 +156,20 @@ body{
   width:14px;height:14px;
   border-radius:50%;
   background:var(--accent);
+  box-shadow:0 0 0 4px rgba(255,122,24,.25);
 }
 
 /* VOLUME */
-#volumeWrap{display:flex;align-items:center;gap:8px}
+#volumeWrap{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
 #volume{
   width:90px;
   appearance:none;
   height:4px;
   background:rgba(255,255,255,.25);
-  border-radius:999px;
 }
 #volume::-webkit-slider-thumb{
   appearance:none;
@@ -164,7 +181,7 @@ body{
 </head>
 
 <body>
-<div class="wrap" id="wrap">
+<div class="wrap">
 
   <div id="player"></div>
 
@@ -175,7 +192,9 @@ body{
     <button id="bigPlay">▶</button>
   </div>
 
-  <div id="loader"><div class="spinner"></div></div>
+  <div id="loader">
+    <div class="spinner"></div>
+  </div>
 
   <div id="controls">
     <button id="playPause" class="btn">▶</button>
@@ -186,27 +205,32 @@ body{
     </div>
 
     <div id="time">0:00 / 0:00</div>
-    <input id="progress" type="range" min="0" max="100" value="0">
+    <input id="progress" type="range" min="0" max="100" value="0" step="0.1">
   </div>
 
 </div>
 
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
-function fmt(s){s=Math.floor(s||0);return Math.floor(s/60)+':'+(s%60<10?'0':'')+s%60}
-function getVideoId(){const u=new URL(location.href);return u.searchParams.get('v')||u.hash.replace('#','')}
+function fmt(sec){
+  sec=Math.floor(sec||0);
+  return Math.floor(sec/60)+':' + (sec%60<10?'0':'')+(sec%60);
+}
 
-let player,duration=0,isPlaying=false,seeking=false,timer=null,hideTimer=null;
-let playerReady=false,isMuted=false;
+function getVideoId(){
+  const u=new URL(location.href);
+  return u.searchParams.get('v') || u.hash.replace('#','');
+}
 
-const wrap=document.getElementById('wrap');
+let player, duration=0, timer=null, seeking=false;
+let isPlaying=false, playerReady=false, isMuted=false;
+
 const overlay=document.getElementById('overlay');
 const bigPlay=document.getElementById('bigPlay');
 const playPause=document.getElementById('playPause');
 const progress=document.getElementById('progress');
 const timeEl=document.getElementById('time');
 const loader=document.getElementById('loader');
-const controls=document.getElementById('controls');
 const volume=document.getElementById('volume');
 const muteBtn=document.getElementById('mute');
 
@@ -216,102 +240,110 @@ function onYouTubeIframeAPIReady(){
   if(!VIDEO_ID) return;
   player=new YT.Player('player',{
     videoId:VIDEO_ID,
-    playerVars:{controls:0,modestbranding:1,rel:0,playsinline:1,disablekb:1},
-    events:{onReady,onStateChange}
+    playerVars:{
+      controls:0,
+      modestbranding:1,
+      rel:0,
+      fs:1,
+      playsinline:1,
+      iv_load_policy:3,
+      disablekb:1
+    },
+    events:{
+      onReady:onReady,
+      onStateChange:onStateChange
+    }
   });
 }
 window.onYouTubeIframeAPIReady=onYouTubeIframeAPIReady;
 
 function onReady(){
   playerReady=true;
-  duration=player.getDuration();
+  duration=player.getDuration()||0;
   updateUI();
 }
 
 function onStateChange(e){
-  if(e.data===YT.PlayerState.BUFFERING) loader.style.display='flex';
-
+  if(e.data===YT.PlayerState.BUFFERING){
+    loader.style.display='flex';
+  }
   if(e.data===YT.PlayerState.PLAYING){
     loader.style.display='none';
-    overlay.style.display='none';
     isPlaying=true;
+    overlay.style.display='none';
     playPause.textContent='⏸';
     startTick();
-    autoHide();
   }
-
   if(e.data===YT.PlayerState.PAUSED){
     isPlaying=false;
+    loader.style.display='none';
     playPause.textContent='▶';
-    showControls();
     stopTick();
   }
 }
 
+/* PLAY HANDLERS */
 function safePlay(){
-  if(!playerReady) return;
+  if(!player || !playerReady) return;
   loader.style.display='flex';
   player.playVideo();
 }
 
 function togglePlay(){
-  if(!playerReady) return;
-  isPlaying ? player.pauseVideo() : safePlay();
+  if(!player || !playerReady) return;
+  if(isPlaying){
+    player.pauseVideo();   // pause = NO reload
+  }else{
+    loader.style.display='flex';
+    player.playVideo();    // play = loader
+  }
 }
 
 bigPlay.onclick=safePlay;
 playPause.onclick=togglePlay;
 
 /* SEEK */
-progress.oninput=()=>{seeking=true}
-progress.onchange=()=>{
+progress.oninput=()=>{
   if(!duration) return;
+  seeking=true;
+  const t=(progress.value/100)*duration;
+  timeEl.textContent=fmt(t)+' / '+fmt(duration);
+};
+progress.onchange=()=>{
+  if(!player || !duration) return;
   player.seekTo((progress.value/100)*duration,true);
   seeking=false;
-}
+};
 
 /* VOLUME */
 volume.oninput=()=>{
+  if(!player) return;
   player.setVolume(volume.value);
   isMuted=volume.value==0;
   muteBtn.textContent=isMuted?'🔇':'🔊';
-}
+};
 muteBtn.onclick=()=>{
+  if(!player) return;
   isMuted=!isMuted;
   player[isMuted?'mute':'unMute']();
   muteBtn.textContent=isMuted?'🔇':'🔊';
-}
+};
 
-/* UI UPDATE */
-function startTick(){stopTick();timer=setInterval(updateUI,400)}
-function stopTick(){clearInterval(timer)}
+/* UI TICK */
+function startTick(){
+  stopTick();
+  timer=setInterval(updateUI,400);
+}
+function stopTick(){
+  if(timer){clearInterval(timer);timer=null;}
+}
 function updateUI(){
   if(!player) return;
-  const c=player.getCurrentTime();
-  if(!seeking && duration) progress.value=(c/duration)*100;
-  timeEl.textContent=fmt(c)+' / '+fmt(duration);
+  const cur=player.getCurrentTime()||0;
+  if(!seeking && duration) progress.value=(cur/duration)*100;
+  timeEl.textContent=fmt(cur)+' / '+fmt(duration);
 }
 
-/* AUTO-HIDE CONTROLS */
-function autoHide(){
-  clearTimeout(hideTimer);
-  hideTimer=setTimeout(()=>controls.classList.add('controls-hidden'),2200);
-}
-function showControls(){
-  controls.classList.remove('controls-hidden');
-  if(isPlaying) autoHide();
-}
-
-/* DESKTOP MOVE */
-wrap.addEventListener('mousemove',showControls);
-
-/* MOBILE TAP */
-wrap.addEventListener('touchend',e=>{
-  if(e.target.closest('.btn')||e.target.closest('input')) return;
-  controls.classList.toggle('controls-hidden');
-});
-
-/* BLOCK RIGHT CLICK */
 document.getElementById('videoBlocker')
   .addEventListener('contextmenu',e=>e.preventDefault());
 </script>
