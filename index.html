@@ -178,7 +178,8 @@ body{
   transform: translateY(0);
 }
 
-#time{
+/* TIMER - Now shows current time and total duration */
+#timer{
   font-size:12px;
   color:var(--muted);
   min-width:96px;
@@ -187,111 +188,126 @@ body{
   padding:8px 10px;
   border-radius:10px;
   font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  letter-spacing: 0.5px;
 }
 
 /* PROGRESS */
-#progress{
-  flex:1;
-  appearance:none;
-  height:4px;
-  background:rgba(255,255,255,.25);
-  border-radius:999px;
-  cursor:pointer;
-  transition: height 0.2s ease;
-}
-#progress:hover{
-  height:6px;
-}
-#progress::-webkit-slider-thumb{
-  appearance:none;
-  width:14px;height:14px;
-  border-radius:50%;
-  background:var(--accent);
-  box-shadow:0 0 0 4px rgba(255,122,24,.25);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-#progress::-webkit-slider-thumb:hover{
-  transform: scale(1.2);
-  box-shadow:0 0 0 6px rgba(255,122,24,.3);
-}
-
-/* PROGRESS BAR FILL */
 .progress-container {
   position: relative;
   flex: 1;
+  height: 4px;
+  background: rgba(255,255,255,.25);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: height 0.2s ease;
+}
+
+.progress-container:hover {
+  height: 6px;
 }
 
 .progress-fill {
   position: absolute;
-  height: 4px;
+  height: 100%;
   background: var(--accent);
   border-radius: 999px;
-  top: 0;
-  left: 0;
+  width: 0%;
   pointer-events: none;
   transition: height 0.2s ease;
 }
 
-#progress:hover + .progress-fill {
-  height: 6px;
+.progress-handle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: var(--accent);
+  border-radius: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  box-shadow: 0 0 0 4px rgba(255,122,24,.25);
 }
 
-/* VOLUME */
-#volumeWrap{
-  display:flex;
-  align-items:center;
-  gap:8px;
+.progress-container:hover .progress-handle {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1.2);
+}
+
+/* VOLUME CONTROL - Vertical popup */
+.volume-container {
   position: relative;
 }
 
-#volume{
-  width:90px;
-  appearance:none;
-  height:4px;
-  background:rgba(255,255,255,.25);
-  border-radius:999px;
-  transition: width 0.3s ease, opacity 0.3s ease;
-}
-#volume.hidden {
-  width: 0;
+.volume-popup {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 10px;
+  background: var(--panel);
+  padding: 12px 8px;
+  border-radius: 10px;
   opacity: 0;
-}
-#volume::-webkit-slider-thumb{
-  appearance:none;
-  width:12px;height:12px;
-  border-radius:50%;
-  background:var(--accent);
-  transition: transform 0.2s ease;
-}
-#volume::-webkit-slider-thumb:hover{
-  transform: scale(1.2);
+  visibility: hidden;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 30px rgba(0,0,0,.4);
 }
 
-/* VIDEO INFO */
-#videoInfo {
+.volume-popup.show {
+  opacity: 1;
+  visibility: visible;
+}
+
+.volume-slider {
+  width: 4px;
+  height: 100px;
+  appearance: none;
+  background: rgba(255,255,255,.25);
+  border-radius: 999px;
+  cursor: pointer;
+  writing-mode: bt-lr; /* IE */
+  -webkit-appearance: slider-vertical;
+  margin: 0 auto;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
+
+.volume-fill {
   position: absolute;
-  top: 16px;
-  left: 16px;
-  right: 16px;
-  z-index: 6;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  width: 4px;
+  background: var(--accent);
+  border-radius: 999px;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
   pointer-events: none;
 }
 
-#videoTitle {
+.volume-value {
+  position: absolute;
+  top: -25px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: var(--muted);
   background: var(--panel);
-  padding: 8px 16px;
-  border-radius: 10px;
-  font-size: 14px;
-  max-width: 70%;
+  padding: 2px 6px;
+  border-radius: 4px;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  backdrop-filter: blur(10px);
 }
 
+/* FULLSCREEN BUTTON */
 #fullscreenBtn {
   background: var(--panel);
   border: 0;
@@ -301,49 +317,11 @@ body{
   padding: 8px 12px;
   border-radius: 10px;
   transition: all 0.2s ease;
-  pointer-events: auto;
 }
 
 #fullscreenBtn:hover {
   background: var(--accent-soft);
   transform: translateY(-1px);
-}
-
-/* ERROR MESSAGE */
-#errorMessage {
-  position: absolute;
-  inset: 0;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0,0,0,0.9);
-  z-index: 10;
-  padding: 20px;
-  text-align: center;
-}
-
-.error-content {
-  background: var(--panel);
-  padding: 24px;
-  border-radius: var(--radius);
-  max-width: 400px;
-  border-left: 4px solid #ff3d3d;
-}
-
-.error-content h3 {
-  margin-top: 0;
-  color: #ff3d3d;
-}
-
-/* VOLUME FILL */
-.volume-fill {
-  position: absolute;
-  height: 4px;
-  background: var(--accent);
-  border-radius: 999px;
-  top: 0;
-  left: 0;
-  pointer-events: none;
 }
 
 /* RESPONSIVE */
@@ -365,13 +343,13 @@ body{
     min-width: 36px;
   }
   
-  #time {
+  #timer {
     min-width: 80px;
     font-size: 11px;
   }
   
-  #volume {
-    width: 70px;
+  .volume-slider {
+    height: 80px;
   }
 }
 </style>
@@ -388,96 +366,154 @@ body{
     <button id="bigPlay">▶</button>
   </div>
   
-  <div id="videoInfo">
-    <div id="videoTitle">Custom YouTube Player</div>
-    <button id="fullscreenBtn" class="btn">⛶</button>
-  </div>
-  
   <div id="loader">
     <div class="spinner"></div>
-  </div>
-  
-  <div id="errorMessage">
-    <div class="error-content">
-      <h3>Video Error</h3>
-      <p>Unable to load the video. Please check the URL or try another video.</p>
-      <button id="retryBtn" class="btn" style="margin-top: 16px; background: var(--accent);">Try Again</button>
-    </div>
   </div>
   
   <div id="controls">
     <button id="playPause" class="btn">▶</button>
     
-    <div id="volumeWrap">
-      <button id="mute" class="btn">🔊</button>
-      <div class="volume-fill"></div>
-      <input id="volume" type="range" min="0" max="100" value="100">
-    </div>
-    
-    <div id="time">0:00 / 0:00</div>
+    <div id="timer">0:00 / 0:00</div>
     
     <div class="progress-container">
       <div class="progress-fill"></div>
-      <input id="progress" type="range" min="0" max="100" value="0" step="0.1">
+      <div class="progress-handle"></div>
     </div>
+    
+    <div class="volume-container">
+      <button id="mute" class="btn">🔊</button>
+      <div class="volume-popup">
+        <div class="volume-value">100%</div>
+        <div class="volume-fill"></div>
+        <input id="volume" type="range" min="0" max="100" value="100" class="volume-slider">
+      </div>
+    </div>
+    
+    <button id="fullscreenBtn" class="btn">⛶</button>
   </div>
 </div>
 
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
-function fmt(sec){
-  sec = Math.floor(sec || 0);
-  const hours = Math.floor(sec / 3600);
-  const minutes = Math.floor((sec % 3600) / 60);
-  const seconds = sec % 60;
+function formatTime(seconds){
+  seconds = Math.floor(seconds || 0);
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
   
   if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  return `${minutes}:${secs.toString().padStart(2, '0')}`;
 }
 
 function getVideoId(){
   const u = new URL(location.href);
-  const videoId = u.searchParams.get('v') || u.hash.replace('#', '') || 'dQw4w9WgXcQ'; // Default video
-  return videoId.length === 11 ? videoId : 'dQw4w9WgXcQ'; // Validate video ID length
+  const videoId = u.searchParams.get('v') || u.hash.replace('#', '') || 'dQw4w9WgXcQ';
+  return videoId.length === 11 ? videoId : 'dQw4w9WgXcQ';
 }
 
 let player, duration = 0, isPlaying = false, timer = null, seeking = false;
-let playerReady = false, isMuted = false, hideControlsTimer = null;
-let videoTitle = "Custom YouTube Player";
+let playerReady = false, isMuted = false;
+let mouseMoveTimer, volumePopupTimer;
+let showVolumePopup = false;
 
 const overlay = document.getElementById('overlay');
 const bigPlay = document.getElementById('bigPlay');
 const playPause = document.getElementById('playPause');
-const progress = document.getElementById('progress');
+const timerEl = document.getElementById('timer');
+const progressContainer = document.querySelector('.progress-container');
 const progressFill = document.querySelector('.progress-fill');
-const timeEl = document.getElementById('time');
+const progressHandle = document.querySelector('.progress-handle');
 const loader = document.getElementById('loader');
-const volume = document.getElementById('volume');
+const volumeSlider = document.getElementById('volume');
 const volumeFill = document.querySelector('.volume-fill');
+const volumeValue = document.querySelector('.volume-value');
+const volumePopup = document.querySelector('.volume-popup');
 const muteBtn = document.getElementById('mute');
 const fullscreenBtn = document.getElementById('fullscreenBtn');
 const videoBlocker = document.getElementById('videoBlocker');
 const controls = document.getElementById('controls');
-const errorMessage = document.getElementById('errorMessage');
-const videoTitleEl = document.getElementById('videoTitle');
-const retryBtn = document.getElementById('retryBtn');
 
 const VIDEO_ID = getVideoId();
 
 // Show/hide controls with mouse movement
-let mouseMoveTimer;
 videoBlocker.addEventListener('mousemove', () => {
   controls.classList.remove('hidden');
   overlay.classList.remove('fade-out');
   clearTimeout(mouseMoveTimer);
   mouseMoveTimer = setTimeout(() => {
-    if (isPlaying) {
+    if (isPlaying && !showVolumePopup) {
       controls.classList.add('hidden');
       overlay.classList.add('fade-out');
     }
   }, 3000);
+});
+
+// Progress bar interaction
+progressContainer.addEventListener('click', (e) => {
+  if (!playerReady || !duration) return;
+  
+  const rect = progressContainer.getBoundingClientRect();
+  const percent = (e.clientX - rect.left) / rect.width;
+  const time = percent * duration;
+  
+  player.seekTo(time, true);
+  updateProgress(time / duration * 100);
+});
+
+progressContainer.addEventListener('mousemove', (e) => {
+  if (!playerReady || !duration) return;
+  
+  const rect = progressContainer.getBoundingClientRect();
+  const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  const time = percent * duration;
+  
+  // Preview time on hover
+  timerEl.textContent = `${formatTime(time)} / ${formatTime(duration)}`;
+});
+
+// Volume popup control
+muteBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  toggleMute();
+});
+
+muteBtn.addEventListener('mouseenter', () => {
+  showVolumePopup = true;
+  volumePopup.classList.add('show');
+  clearTimeout(volumePopupTimer);
+});
+
+muteBtn.addEventListener('mouseleave', () => {
+  volumePopupTimer = setTimeout(() => {
+    showVolumePopup = false;
+    volumePopup.classList.remove('show');
+  }, 300);
+});
+
+volumePopup.addEventListener('mouseenter', () => {
+  showVolumePopup = true;
+  clearTimeout(volumePopupTimer);
+});
+
+volumePopup.addEventListener('mouseleave', () => {
+  volumePopupTimer = setTimeout(() => {
+    showVolumePopup = false;
+    volumePopup.classList.remove('show');
+  }, 300);
+});
+
+// Volume slider
+volumeSlider.addEventListener('input', (e) => {
+  const value = e.target.value;
+  if (!player) return;
+  
+  player.setVolume(value);
+  isMuted = value == 0;
+  muteBtn.textContent = isMuted ? '🔇' : '🔊';
+  updateVolumeFill(value);
+  volumeValue.textContent = `${value}%`;
 });
 
 // Fullscreen functionality
@@ -488,23 +524,20 @@ function toggleFullscreen() {
     container.requestFullscreen().catch(err => {
       console.log(`Error attempting to enable fullscreen: ${err.message}`);
     });
-    fullscreenBtn.textContent = '⛶';
   } else {
     document.exitFullscreen();
-    fullscreenBtn.textContent = '⛶';
   }
 }
 
-// Update progress fill width
-function updateProgressFill() {
-  const progressWidth = progress.value + '%';
-  progressFill.style.width = progressWidth;
+// Update progress bar
+function updateProgress(percent) {
+  progressFill.style.width = `${percent}%`;
+  progressHandle.style.left = `${percent}%`;
 }
 
-// Update volume fill width
-function updateVolumeFill() {
-  const volumeWidth = volume.value + '%';
-  volumeFill.style.width = volumeWidth;
+// Update volume fill
+function updateVolumeFill(value) {
+  volumeFill.style.height = `${value}%`;
 }
 
 function onYouTubeIframeAPIReady(){
@@ -522,8 +555,7 @@ function onYouTubeIframeAPIReady(){
     },
     events: {
       onReady: onReady,
-      onStateChange: onStateChange,
-      onError: onPlayerError
+      onStateChange: onStateChange
     }
   });
 }
@@ -535,21 +567,10 @@ function onReady(){
   loader.style.display = 'none';
   updateUI();
   
-  // Get video title
-  try {
-    const videoData = player.getVideoData();
-    videoTitle = videoData.title || "YouTube Video";
-    videoTitleEl.textContent = videoTitle;
-  } catch(e) {
-    console.log("Could not get video title");
-  }
-}
-
-function onPlayerError(event) {
-  console.error("YouTube Player Error:", event.data);
-  loader.style.display = 'none';
-  errorMessage.style.display = 'flex';
-  overlay.style.display = 'none';
+  // Set initial volume
+  player.setVolume(100);
+  updateVolumeFill(100);
+  volumeValue.textContent = '100%';
 }
 
 function onStateChange(e){
@@ -565,7 +586,7 @@ function onStateChange(e){
     
     // Auto-hide controls after 3 seconds
     setTimeout(() => {
-      if (isPlaying) {
+      if (isPlaying && !showVolumePopup) {
         controls.classList.add('hidden');
         overlay.classList.add('fade-out');
       }
@@ -587,17 +608,6 @@ function onStateChange(e){
   }
 }
 
-function safePlay(){
-  if(!player || !playerReady) return;
-  loader.style.display = 'flex';
-  
-  if (player.getPlayerState() === YT.PlayerState.ENDED) {
-    player.seekTo(0);
-  }
-  
-  player.playVideo();
-}
-
 function togglePlay(){
   if(!player || !playerReady) return;
 
@@ -607,50 +617,36 @@ function togglePlay(){
     if (player.getPlayerState() === YT.PlayerState.ENDED) {
       player.seekTo(0);
     }
-    loader.style.display = 'flex';
     player.playVideo();
   }
 }
 
-bigPlay.onclick = safePlay;     
-playPause.onclick = togglePlay;
-
-progress.oninput = () => {
-  if(!duration) return;
-  seeking = true;
-  const t = (progress.value / 100) * duration;
-  timeEl.textContent = fmt(t) + ' / ' + fmt(duration);
-  updateProgressFill();
-};
-
-progress.onchange = () => {
-  if(!player || !duration) return;
-  const t = (progress.value / 100) * duration;
-  player.seekTo(t, true);
-  seeking = false;
-};
-
-volume.oninput = () => {
-  if(!player) return;
-  player.setVolume(volume.value);
-  isMuted = volume.value == 0;
-  muteBtn.textContent = isMuted ? '🔇' : '🔊';
-  updateVolumeFill();
-};
-
-muteBtn.onclick = () => {
+function toggleMute(){
   if(!player) return;
   isMuted = !isMuted;
   player[isMuted ? 'mute' : 'unMute']();
   muteBtn.textContent = isMuted ? '🔇' : '🔊';
   
   if (isMuted) {
-    volume.value = 0;
+    volumeSlider.value = 0;
   } else {
-    volume.value = 100;
+    volumeSlider.value = 100;
   }
-  updateVolumeFill();
+  updateVolumeFill(volumeSlider.value);
+  volumeValue.textContent = `${volumeSlider.value}%`;
+}
+
+bigPlay.onclick = () => {
+  if(!player || !playerReady) return;
+  
+  if (player.getPlayerState() === YT.PlayerState.ENDED) {
+    player.seekTo(0);
+  }
+  
+  player.playVideo();
 };
+
+playPause.onclick = togglePlay;
 
 function startTick(){
   stopTick();
@@ -666,17 +662,18 @@ function stopTick(){
 
 function updateUI(){
   if(!player) return;
-  const cur = player.getCurrentTime() || 0;
-  if(!seeking && duration) {
-    progress.value = (cur / duration) * 100;
-    updateProgressFill();
+  const currentTime = player.getCurrentTime() || 0;
+  const percent = (currentTime / duration) * 100 || 0;
+  
+  if(!seeking) {
+    updateProgress(percent);
   }
-  timeEl.textContent = fmt(cur) + ' / ' + fmt(duration);
+  
+  timerEl.textContent = `${formatTime(currentTime)} / ${formatTime(duration)}`;
 }
 
-// Initialize volume fill
-updateVolumeFill();
-updateProgressFill();
+// Initialize
+updateVolumeFill(100);
 
 // Prevent right-click on video
 videoBlocker.addEventListener('contextmenu', e => e.preventDefault());
@@ -687,38 +684,6 @@ videoBlocker.addEventListener('click', () => {
     togglePlay();
   }
 });
-
-// Retry button for error handling
-retryBtn.addEventListener('click', () => {
-  errorMessage.style.display = 'none';
-  loader.style.display = 'flex';
-  player.loadVideoById(VIDEO_ID);
-});
-
-// Initialize with default YouTube video if none specified
-if (!VIDEO_ID || VIDEO_ID.length !== 11) {
-  // Use a default video
-  const defaultVideoId = 'dQw4w9WgXcQ';
-  if (typeof YT !== 'undefined' && YT.Player) {
-    player = new YT.Player('player', {
-      videoId: defaultVideoId,
-      playerVars: {
-        controls: 0,
-        modestbranding: 1,
-        rel: 0,
-        fs: 1,
-        playsinline: 1,
-        iv_load_policy: 3,
-        disablekb: 1
-      },
-      events: {
-        onReady: onReady,
-        onStateChange: onStateChange,
-        onError: onPlayerError
-      }
-    });
-  }
-}
 
 // Handle fullscreen change
 document.addEventListener('fullscreenchange', () => {
@@ -737,7 +702,7 @@ document.addEventListener('keydown', (e) => {
       break;
     case 'm':
       e.preventDefault();
-      muteBtn.click();
+      toggleMute();
       break;
     case 'f':
       e.preventDefault();
@@ -755,6 +720,32 @@ document.addEventListener('keydown', (e) => {
       if (player) {
         const currentTime = player.getCurrentTime();
         player.seekTo(Math.min(duration, currentTime + 5), true);
+      }
+      break;
+    case 'ArrowUp':
+      e.preventDefault();
+      if (player) {
+        const currentVolume = parseInt(volumeSlider.value);
+        const newVolume = Math.min(100, currentVolume + 10);
+        volumeSlider.value = newVolume;
+        player.setVolume(newVolume);
+        updateVolumeFill(newVolume);
+        volumeValue.textContent = `${newVolume}%`;
+        muteBtn.textContent = newVolume === 0 ? '🔇' : '🔊';
+        isMuted = newVolume === 0;
+      }
+      break;
+    case 'ArrowDown':
+      e.preventDefault();
+      if (player) {
+        const currentVolume = parseInt(volumeSlider.value);
+        const newVolume = Math.max(0, currentVolume - 10);
+        volumeSlider.value = newVolume;
+        player.setVolume(newVolume);
+        updateVolumeFill(newVolume);
+        volumeValue.textContent = `${newVolume}%`;
+        muteBtn.textContent = newVolume === 0 ? '🔇' : '🔊';
+        isMuted = newVolume === 0;
       }
       break;
   }
